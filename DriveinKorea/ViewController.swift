@@ -53,16 +53,28 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
     @IBAction func showButtonPressed(sender: UIButton) {
         //logic:
         if (showButton.enabled==true) {
-            if (self.showButton.titleLabel?.text=="Show All") {
+            if (self.showButton.titleLabel?.text=="Overview") {
                 self.map.removeAnnotations(self.map.annotations)
                 self.map.addAnnotations(self.annotationList)
                 self.map.showAnnotations(self.map.annotations, animated: true)
-                sender.setTitle("Near me", forState: UIControlState.Normal)
+
+                if (self.searchType == 1) {
+                    sender.setTitle("Results", forState: UIControlState.Normal)
+                } else {
+                    sender.setTitle("Near me", forState: UIControlState.Normal)
+                }
+
             }else {
-                self.map.removeAnnotations(self.map.annotations)
-                self.map.addAnnotations(self.annotationInRectList)
-                self.map.showAnnotations(self.map.annotations, animated: true)
-                sender.setTitle("Show All", forState: UIControlState.Normal)
+                if (self.searchType == 1) {
+                    self.map.showsUserLocation = false
+                    self.map.showAnnotations(self.map.annotations, animated: true)
+                    self.map.showsUserLocation = true
+                } else {
+                    self.map.removeAnnotations(self.map.annotations)
+                    self.map.addAnnotations(self.annotationInRectList)
+                    self.map.showAnnotations(self.map.annotations, animated: true)
+                }
+                sender.setTitle("Overview", forState: UIControlState.Normal)
             }
         }
     }
@@ -98,7 +110,12 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
             return true
         }
         
-        self.searchType = 0
+        if regionContains(self.map.region, self.map.userLocation.location.coordinate) {
+            self.searchType = 0 //if user location is inside current view
+        } else {
+            self.searchType = 1 //if user location is outside current view
+        }
+        
         var uLocLat = self.map.region.center.latitude
         var uLocLon = self.map.region.center.longitude
         
@@ -121,15 +138,7 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                 keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
                 gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=\(keyword)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
             }
-/*            } else {
-                if (keywordHasKr){
-                    gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find?text=\(string2UTF8(keyword))&Postal=\(poscode)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
-                }else {
-                    //replace spaces with "%20" for english inquery
-                    keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
-                    gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find?text=\(keyword)&Postal=\(poscode)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
-                }
-            } */
+
             var request = NSURLRequest(URL: gisUrl)
             
             let session = NSURLSession.sharedSession()
@@ -316,16 +325,33 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                 dispatch_async(dispatch_get_main_queue()) {
                     self.spinner.stopAnimating()
                     self.spinner.hidden = true
-
-                    if (self.annotationInRectList.count==self.annotationList.count) {
-                        //println("all \(self.annotationList.count) in region")
+                    println(self.searchType)
+                    
+                    if self.searchType == 1 {
+                        self.map.showsUserLocation = false
                         self.map.addAnnotations(self.annotationList)
                         self.map.showAnnotations(self.map.annotations, animated: false)
-                    }else {
-                        println("google found \(places.count) place(s)")
-                        self.map.addAnnotations(self.annotationInRectList)
-                        self.map.showAnnotations(self.map.annotations, animated: false)
                         self.showButton.enabled = true
+                        
+                        if regionContains(self.map.region, self.map.userLocation.location.coordinate){
+                            self.map.showsUserLocation = true
+                            self.map.addAnnotations(self.annotationList)
+                            self.map.showAnnotations(self.map.annotations, animated: false)
+                            self.showButton.enabled = false
+                        }
+                        self.map.showsUserLocation = true
+
+                    } else {
+                        if (self.annotationInRectList.count==self.annotationList.count) {
+                            //println("all \(self.annotationList.count) in region")
+                            self.map.addAnnotations(self.annotationList)
+                            self.map.showAnnotations(self.map.annotations, animated: false)
+                        }else {
+                            println("google found \(places.count) place(s)")
+                            self.map.addAnnotations(self.annotationInRectList)
+                            self.map.showAnnotations(self.map.annotations, animated: false)
+                            self.showButton.enabled = true
+                        }
                     }
                 }
             }
@@ -352,26 +378,7 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
         }
 
     }
-/*
-    func arcgisFindFound(candidate: NSDictionary) ->Void {
-        var location = (candidate["location"]) as NSDictionary
-        var pt = ((location["feature"] as NSDictionary) as NSDictionary)["geometry"] as NSDictionary
-        var lati = pt["y"] as Double
-        //println(lati)
-        
-        var longti = pt["x"] as Double
-        //println(longti)
-        
-        var coordinate:CLLocationCoordinate2D = CLLocationCoordinate2DMake(lati, longti)
-        
-        var annotation = DriveAnnotation(title: candidate["address"] as NSString, locationName: "(\(lati),\(longti))" as NSString, coordinate: coordinate)
-        dispatch_async(dispatch_get_main_queue()) {
-            self.map.addAnnotation(annotation)
-            self.map.showAnnotations(self.map.annotations, animated: false)
-        }
-        
-    }
-*/
+
     func locationManager(manager: CLLocationManager!, didUpdateLocations locations: [AnyObject]!) {
 
         var userLocation: CLLocation = locations[0] as CLLocation

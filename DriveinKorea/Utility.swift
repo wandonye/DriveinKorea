@@ -81,8 +81,11 @@ func findPoscode(inout str: String) ->String { //return poscode or "" if nothing
             
             var prevStr = str[start1...end1]
             var postStr = str[start2...end2]
-            let tester1 = prevStr.stringByReplacingOccurrencesOfString("[0-9]", withString: "")
-            let tester2 = postStr.stringByReplacingOccurrencesOfString("[0-9]", withString: "")
+            let numSet = NSCharacterSet.decimalDigitCharacterSet()
+            let tester1 = prevStr.stringByTrimmingCharactersInSet(numSet)
+            let tester2 = postStr.stringByTrimmingCharactersInSet(numSet)
+            println(tester1)
+            println(tester2)
             if (tester1 == "" && tester2 == "") {
                 var poscode = str[start1...end2]
                 str = str.stringByReplacingOccurrencesOfString(poscode, withString: "", options: NSStringCompareOptions.RegularExpressionSearch).stringByTrimmingCharactersInSet(spaceSet)
@@ -94,11 +97,25 @@ func findPoscode(inout str: String) ->String { //return poscode or "" if nothing
     return ""
 }
 
-func hasCity(str: NSString) ->Int {
+func hasCity(str: String) ->Int {
+    
+    if let range = str.rangeOfString("-si" as String, options: NSStringCompareOptions.CaseInsensitiveSearch){
+        var cityst = str.rangeOfString(" ", options: NSStringCompareOptions.BackwardsSearch, range: Range<String.Index>(start: str.startIndex,end: range.startIndex))?.endIndex
+        var cityend = advance(range.startIndex,-1)
+        var cityname = str[cityst!...cityend]
+        
+        if String(cityname[cityname.startIndex]).lowercaseString == String(cityname[cityname.startIndex]) {
+            cityname.replaceRange(cityname.startIndex...cityname.startIndex, with: String(cityname[cityname.startIndex]).uppercaseString)
+        }
+        
+        return eCityDict.indexOfObject(cityname)
+    }
+    
     var index = 0
+    
     for eCity in eCityDict {
 
-        if ((str as String).rangeOfString(eCity as String, options: NSStringCompareOptions.CaseInsensitiveSearch) != nil){
+        if (str.rangeOfString(eCity as String, options: NSStringCompareOptions.CaseInsensitiveSearch) != nil){
             return index
             //has enlish city name
         }
@@ -106,12 +123,14 @@ func hasCity(str: NSString) ->Int {
     }
 
     index = 0
+    
     for kCity in kCityDict {
-        if ((str as String).rangeOfString(kCity as String) != nil){
+        if (str.rangeOfString(kCity as String) != nil){
             return index
             //has korean city name
         }
         index += 1
     }
+    //println("no city found")
     return -1
 }

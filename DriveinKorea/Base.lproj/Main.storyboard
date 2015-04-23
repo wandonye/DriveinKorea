@@ -51,15 +51,20 @@
                                     <action selector="locateMe:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="mmZ-Hn-WRK"/>
                                 </connections>
                             </button>
+                            <activityIndicatorView hidden="YES" opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" style="gray" translatesAutoresizingMaskIntoConstraints="NO" id="8Jf-Xr-XSo">
+                                <rect key="frame" x="177" y="288" width="20" height="20"/>
+                            </activityIndicatorView>
                         </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
                         <constraints>
+                            <constraint firstItem="8Jf-Xr-XSo" firstAttribute="centerX" secondItem="c2O-J7-LhO" secondAttribute="centerX" id="2Ed-XN-fej"/>
                             <constraint firstItem="elv-yL-JDd" firstAttribute="top" secondItem="LE2-0H-qft" secondAttribute="top" id="6Nw-rt-jWt"/>
                             <constraint firstItem="nCQ-Ua-dkV" firstAttribute="leading" secondItem="kh9-bI-dsS" secondAttribute="leadingMargin" constant="-6" id="7mv-UV-Oxt"/>
                             <constraint firstAttribute="bottom" secondItem="c2O-J7-LhO" secondAttribute="bottom" id="JlS-qG-fFc"/>
                             <constraint firstItem="2fi-mo-0CV" firstAttribute="top" secondItem="nCQ-Ua-dkV" secondAttribute="bottom" constant="26" id="KRq-8e-Efw"/>
                             <constraint firstAttribute="trailing" secondItem="c2O-J7-LhO" secondAttribute="trailing" id="O3j-AI-m0x"/>
                             <constraint firstItem="c2O-J7-LhO" firstAttribute="top" secondItem="LE2-0H-qft" secondAttribute="bottom" constant="12" id="O9J-ne-jQM"/>
+                            <constraint firstItem="2fi-mo-0CV" firstAttribute="top" secondItem="8Jf-Xr-XSo" secondAttribute="bottom" constant="315" id="cjs-7u-vmy"/>
                             <constraint firstItem="elv-yL-JDd" firstAttribute="leading" secondItem="kh9-bI-dsS" secondAttribute="leadingMargin" constant="-3" id="dNu-mC-Y05"/>
                             <constraint firstItem="c2O-J7-LhO" firstAttribute="leading" secondItem="kh9-bI-dsS" secondAttribute="leading" id="fsG-p0-3KY"/>
                             <constraint firstItem="LE2-0H-qft" firstAttribute="trailing" secondItem="kh9-bI-dsS" secondAttribute="trailingMargin" id="g7H-WE-gPO"/>
@@ -74,6 +79,7 @@
                         <outlet property="map" destination="c2O-J7-LhO" id="T7H-MR-iur"/>
                         <outlet property="searchText" destination="elv-yL-JDd" id="xl2-SM-9lN"/>
                         <outlet property="showButton" destination="LE2-0H-qft" id="365-9N-2ku"/>
+                        <outlet property="spinner" destination="8Jf-Xr-XSo" id="hvS-iU-EQ8"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="x5A-6p-PRh" sceneMemberID="firstResponder"/>

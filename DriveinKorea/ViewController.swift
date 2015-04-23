@@ -15,10 +15,12 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
     @IBOutlet var searchText: UITextField!
     @IBOutlet var map: MKMapView!
     @IBOutlet weak var showButton: UIButton!
+    @IBOutlet weak var spinner: UIActivityIndicatorView!
     
     var locationManager = CLLocationManager()
     var annotationList = [DriveAnnotation]()
     var annotationInRectList = [DriveAnnotation]()
+    var searchType = 0
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -27,6 +29,8 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
         
         locationManager.delegate = self
         self.map.delegate = self
+        
+        self.spinner.hidden = true
         
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         if (locationManager.respondsToSelector(Selector("requestWhenInUseAuthorization"))) {
@@ -47,6 +51,7 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
     }
     
     @IBAction func showButtonPressed(sender: UIButton) {
+        //logic:
         if (showButton.enabled==true) {
             if (self.showButton.titleLabel?.text=="Show All") {
                 self.map.removeAnnotations(self.map.annotations)
@@ -73,6 +78,10 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
     
     
     func textFieldShouldReturn(textField: UITextField!) ->Bool {
+        
+        self.spinner.hidden = false
+        self.spinner.startAnimating()
+        
         textField.resignFirstResponder()
     
         let spaceSet = NSCharacterSet.whitespaceCharacterSet()
@@ -80,15 +89,21 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
         var keyword = textField.text.stringByReplacingOccurrencesOfString(
             "[\\$\\!\\#\\@\\.\\/]", withString: "", options: .RegularExpressionSearch).stringByTrimmingCharactersInSet(spaceSet)
         
+        self.searchText.text = keyword
+        
         if keyword == "" {
+            self.spinner.hidden = false
+            self.spinner.startAnimating()
+
             return true
         }
         
+        self.searchType = 0
         var uLocLat = self.map.region.center.latitude
         var uLocLon = self.map.region.center.longitude
         
         var poscode = findPoscode(&keyword)
-        println(keyword)
+        //println(keyword)
         
         var cityIndex = hasCity(keyword)
         var keywordHasKr = hasHaniHang(keyword)
@@ -98,16 +113,15 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
         if let range = keyword.rangeOfCharacterFromSet(numbers) {
             //if keyword contains numbers, it is more likely an address
             var gisUrl = NSURL()
-            //todo: if find code
-            if poscode == "" {
-                if (keywordHasKr){
-                    gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=\(string2UTF8(keyword))&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
-                }else {
-                    //replace spaces with "%20" for english inquery
-                    keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
-                    gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=\(keyword)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
-                }
-            } else {
+            //poscode removed, at the moment, poscode is of no use
+            if (keywordHasKr){
+                gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=\(string2UTF8(keyword))&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
+            }else {
+                //replace spaces with "%20" for english inquery
+                keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
+                gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=\(keyword)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
+            }
+/*            } else {
                 if (keywordHasKr){
                     gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find?text=\(string2UTF8(keyword))&Postal=\(poscode)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
                 }else {
@@ -115,8 +129,7 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                     keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
                     gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find?text=\(keyword)&Postal=\(poscode)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
                 }
-            }
-            //println(gisUrl)
+            } */
             var request = NSURLRequest(URL: gisUrl)
             
             let session = NSURLSession.sharedSession()
@@ -133,23 +146,21 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                     
                     if (err != nil) {
                         println(err)
-                        return
                     } else if ((jsonResultsDict as Dictionary).indexForKey("candidates") == nil) {
                         println("No candidate found: \(gisUrl)")
-                        return
                     } else {
                         var candidates = jsonResultsDict["candidates"] as NSArray
                         
                         if (candidates.count == 0){
                             
                             println("No address matched, will try without poscode: \(gisUrl)")
-                            //try without poscode
+                            //try google
                             if (keywordHasKr){
-                                gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=\(string2UTF8(keyword))&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
+                            gisUrl = NSURL(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(uLocLat),\(uLocLon)&rankby=distance&keyword=\(string2UTF8(keyword))&key=\(gMapKey)")!
                             }else {
-                                //replace spaces with "%20" for english inquery
-                                keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
-                                gisUrl = NSURL(string: "http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=\(keyword)&category=Address&outFields=location&forStorage=false&sourceCountry=KOR&f=json")!
+                            //replace spaces with "%20" for english inquery
+                            keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
+                            gisUrl = NSURL(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(uLocLat),\(uLocLon)&rankby=distance&keyword=\(keyword)&key=\(gMapKey)")!
                             }
                             
                             if let data2 = NSData(contentsOfURL: gisUrl) {
@@ -158,63 +169,110 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                                     
                                     if (err != nil) {
                                         println(err)
-                                        return
-                                    } else if ((jsonResultsDict as Dictionary).indexForKey("candidates") == nil) {
-                                        println(jsonResultsDict)
+                                        self.spinner.stopAnimating()
+                                        self.spinner.hidden = true
+
                                         return
                                     } else {
-                                        var candidates = jsonResultsDict["candidates"] as NSArray
-                                        
-                                        if (candidates.count == 0){
-                                            println("Still no address matched \(gisUrl)")
-                                            return
-                                        } else {
-                                            println("Address without postal matched")
-                                            self.arcgisFindFound((candidates[0]) as NSDictionary)
+                                        if let places = jsonResultsDict["results"] as? NSArray {
+                                            
+                                            if (places.count == 0) {
+                                                println("Google has no result")
+                                                return
+                                            }
+                                            
+                                            for place in places {
+                                                //println(place)
+                                                var lati = (((place as NSDictionary)["geometry"] as NSDictionary)["location"] as NSDictionary)["lat"] as Double
+                                                //println(lati)
+                                                
+                                                var longti = (((place as NSDictionary)["geometry"] as NSDictionary)["location"] as NSDictionary)["lng"] as Double
+                                                //println(longti)
+                                                
+                                                var coordinate:CLLocationCoordinate2D = CLLocationCoordinate2DMake(lati, longti)
+                                                
+                                                var annotation = DriveAnnotation(title: (place as NSDictionary)["name"] as NSString, locationName: (place as NSDictionary)["vicinity"] as NSString, coordinate: coordinate)
+                                                self.annotationList.append(annotation)
+                                                
+                                                if (regionContains(self.map.region, coordinate)) {
+                                                    self.annotationInRectList.append(annotation)
+                                                }
+                                            }
+                                            println("google win")
+                                            println(gisUrl)
+                                            
+                                            //start showing google result
+                                            dispatch_async(dispatch_get_main_queue()) {
+                                                self.spinner.stopAnimating()
+                                                self.spinner.hidden = true
+
+                                                if (self.annotationInRectList.count==self.annotationList.count) {
+                                                    //println("all \(self.annotationList.count) in region")
+                                                    self.map.addAnnotations(self.annotationList)
+                                                    self.map.showAnnotations(self.map.annotations, animated: false)
+                                                }else {
+                                                    println("google found \(places.count) place(s)")
+                                                    self.map.addAnnotations(self.annotationInRectList)
+                                                    self.map.showAnnotations(self.map.annotations, animated: false)
+                                                    self.showButton.enabled = true
+                                                }
+                                            }
+                                            // done showing google result
+
                                         }
                                     }
-                                    
+
                                 }
                             }
                             
                         } else {
-                            println("Address with postal matched")
+                            println("Address matched")
                             
+                            dispatch_async(dispatch_get_main_queue()) {
+                                self.spinner.stopAnimating()
+                                self.spinner.hidden = true
+                            }
                             self.arcgisFindAddressCandFound((candidates[0]) as NSDictionary)
+                            return
                         }
                         
                     }
 
                 }
+                dispatch_async(dispatch_get_main_queue()) {
+                    self.spinner.stopAnimating()
+                    self.spinner.hidden = true
+                }
             })
             task.resume()
-            
-            // in the following case, skip google search
-            //if (keywordHasKr && poscode != "") {
-            //    return true
-            //}
-            //
-            //in case no result, google map with still do the research
+            return true
             
         }else if (hasPreposition(keyword) && cityIndex >= 0) {
             //if keyword contains "near", "in" and a city name
+            self.searchType = 1
             uLocLat = cityCoord.objectAtIndex(cityIndex)["x"] as Double
             uLocLon = cityCoord.objectAtIndex(cityIndex)["y"] as Double
+
+            gmapAsyncGeocoding(keyword, keywordHasKr: keywordHasKr, uLocLat: uLocLat, uLocLon: uLocLon)
+            return true
+            
+        } else {
+            gmapAsyncGeocoding(keyword, keywordHasKr: keywordHasKr, uLocLat: uLocLat, uLocLon: uLocLon)
         }
-        println(uLocLat)
-        println(uLocLon)
-        
-        
         
         //println("region center: (\(uLocLat),\(uLocLon))")
-
+        
+        return true
+    }
+    
+    func gmapAsyncGeocoding(keyword: String, keywordHasKr: Bool, uLocLat: Double, uLocLon: Double) ->Void {
         var url = NSURL()
         if (keywordHasKr){
             url = NSURL(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(uLocLat),\(uLocLon)&rankby=distance&keyword=\(string2UTF8(keyword))&key=\(gMapKey)")!
         }else {
             //replace spaces with "%20" for english inquery
-            keyword=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
-            url = NSURL(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(uLocLat),\(uLocLon)&rankby=distance&keyword=\(keyword)&key=\(gMapKey)")!
+            let keywordFixSpace=keyword.stringByReplacingOccurrencesOfString(" ", withString: "%20", options: NSStringCompareOptions.LiteralSearch, range: nil)
+            url = NSURL(string: "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=\(uLocLat),\(uLocLon)&rankby=distance&keyword=\(keywordFixSpace)&key=\(gMapKey)")!
         }
         
         var request = NSURLRequest(URL: url)
@@ -226,7 +284,7 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                 println(error)
             }else {
                 var jsonResult = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableContainers, error: nil) as NSDictionary
-
+                
                 var places = jsonResult["results"] as NSArray
                 
                 if (places.count == 0) {
@@ -241,12 +299,12 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                     
                     var longti = (((place as NSDictionary)["geometry"] as NSDictionary)["location"] as NSDictionary)["lng"] as Double
                     //println(longti)
-
+                    
                     var coordinate:CLLocationCoordinate2D = CLLocationCoordinate2DMake(lati, longti)
-
+                    
                     var annotation = DriveAnnotation(title: (place as NSDictionary)["name"] as NSString, locationName: (place as NSDictionary)["vicinity"] as NSString, coordinate: coordinate)
                     self.annotationList.append(annotation)
-
+                    
                     if (regionContains(self.map.region, coordinate)) {
                         self.annotationInRectList.append(annotation)
                     }
@@ -256,6 +314,9 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
                 
                 //to do : translate
                 dispatch_async(dispatch_get_main_queue()) {
+                    self.spinner.stopAnimating()
+                    self.spinner.hidden = true
+
                     if (self.annotationInRectList.count==self.annotationList.count) {
                         //println("all \(self.annotationList.count) in region")
                         self.map.addAnnotations(self.annotationList)
@@ -270,9 +331,9 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
             }
         })
         task.resume()
-        
-        return true
+        return
     }
+    
 
     func arcgisFindAddressCandFound(candidate: NSDictionary) ->Void {
         var location = (candidate["location"]) as NSDictionary
@@ -291,6 +352,7 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
         }
 
     }
+/*
     func arcgisFindFound(candidate: NSDictionary) ->Void {
         var location = (candidate["location"]) as NSDictionary
         var pt = ((location["feature"] as NSDictionary) as NSDictionary)["geometry"] as NSDictionary
@@ -309,7 +371,7 @@ class ViewController: UIViewController, UITextFieldDelegate, MKMapViewDelegate, 
         }
         
     }
-    
+*/
     func locationManager(manager: CLLocationManager!, didUpdateLocations locations: [AnyObject]!) {
 
         var userLocation: CLLocation = locations[0] as CLLocation
